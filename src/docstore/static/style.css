@@ -1,120 +1,164 @@
+@import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
 body {
-  background: url('/static/natural_paper.png');
-  font: 14pt Helvetica;
+  background-color: #0D0D0D;
+  color: #00FF00;
+  font-family: 'VT323', monospace;
+  font-size: 16pt; /* A bit larger for retro feel */
   line-height: 1.45em;
   margin: 0;
   padding: 0;
 }
 
 aside {
-  background: url('/static/specktre.png');
-  background-size: auto 100%;
-  padding: 6px 0px 2px 0px;
-  border-bottom: 2px solid #aaa;
-  font: 20pt "Nanum Brush Script";
-  font-weight: bold;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3)
+  background: #0D0D0D;
+  padding: 10px 0px 8px 0px; /* Adjusted padding */
+  border-bottom: 2px solid #008000;
+  font-family: 'VT323', monospace; /* Ensure consistency */
+  font-size: 22pt; /* Adjusted for new font */
+  font-weight: normal; /* VT323 is already quite bold */
+  text-align: center; /* Center aside text */
 }
 
-td {
+table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid #008000;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+td, th {
+  border: 1px dashed #008000; /* Dashed for retro feel */
+  padding: 8px;
+  text-align: left;
   line-height: 1.45em;
-  font-size: 10pt;
+  font-size: 1em; /* Relative to body font size */
+  color: #00FF00;
+}
+
+th {
+  background-color: #003300; /* Darker green for table headers */
+  color: #33FF33;
 }
 
 main, #aside_inner {
   max-width: 940px;
   margin-left:  auto;
   margin-right: auto;
-  padding-left:  20px;
-  padding-right: 20px;
+  padding: 0 20px; /* Adjusted padding */
 }
 
-.thumbnail {
+#aside_inner {
+    padding-bottom: 10px; /* Add some padding to bottom of aside content */
+}
+
+.thumbnail { /* This class seems to be for the container of thumbnail images */
   padding-right: 15px;
+  text-align: center; /* Center thumbnails if they are in a block */
 }
 
 .thumbnail img {
-  width: 100%;
+  /* width: 100%; -- Potentially remove if fixed size is better */
+  max-width: 200px; /* From original inline styles, good to keep */
+  max-height: 200px;/* From original inline styles, good to keep */
+  border: 1px solid #008000;
+  margin-bottom: 5px; /* Space between multiple thumbnails */
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #00FF00;
+  font-weight: normal; /* VT323 is already bold */
+  margin-top: 1em;
+  margin-bottom: 0.5em;
 }
 
 h2 {
-  margin-bottom: 0.5em;
   line-height: 1.25em;
+  font-size: 1.5em; /* Relative to body */
 }
 
-table {
-  width: 100%;
-}
-
-table hr {
-  margin-left:  1em;
-  margin-right: 1em;
-}
-
-hr {
+table hr { /* hr within tables, if any */
+  margin-left:  0;
+  margin-right: 0;
   border: none;
   height: 1px;
-  background: rgba(128, 128, 128, 0.5);
+  background: #008000;
 }
 
-.thumbnail a:hover {
-  background: #606060;
+hr { /* General hr */
+  border: none;
+  height: 1px;
+  background: #008000;
+  margin-top: 1em;
+  margin-bottom: 1em;
 }
 
-.thumbnail a img:hover {
-  opacity: 0.8;
+/* Override for .doc_thumbnail a from index.html's inline styles */
+/* This might be better handled by removing inline styles from HTML */
+.doc_thumbnail a, .doc_thumbnail a:hover {
+    background-color: transparent !important;
 }
+
+.thumbnail a:hover img, .doc_thumbnail a:hover img { /* Applied to img inside link */
+  opacity: 0.7;
+  border-color: #33FF33; /* Highlight border on hover */
+}
+
 
 a {
-  color: #606060;
+  color: #00FF00;
+  text-decoration: none; /* Remove underline for terminal look */
 }
 
 a:hover {
-  background: rgba(128, 128, 128, 0.3);
+  color: #33FF33;
+  background-color: transparent; /* No background color change on hover */
 }
 
 a.remove_tag {
-  color: #d01c11;
-  text-decoration: none;
+  color: #00CC00; /* Slightly different green or keep #00FF00 */
 }
 
 a.remove_tag:hover {
-  background: rgba(208, 28, 17, 0.3);
+  color: #33FF33;
 }
 
 .meta_info {
-  background: white;
-  border: 2px solid #aaa;
+  background: #101010; /* Darker than body, or transparent */
+  border: 1px solid #008000;
   padding: 12px 15px;
-  margin: 1em -14px;
-  border-radius: 8px;
-  font-size: 13pt;
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.2);
+  margin: 1em 0; /* Adjusted margin */
+  border-radius: 0; /* Remove rounded corners for blocky feel */
+  font-size: 1em; /* Relative to body */
 }
 
 .meta_info ul {
   line-height: 1.4em;
+  list-style-type: square; /* More retro list style */
+  padding-left: 20px;
 }
 
 #tag_cloud {
-  text-align: justify;
+  text-align: left; /* Justify might look odd with monospace */
 }
 
 #tag_cloud .tag {
   display: inline-block;
+  margin-right: 10px; /* Space out tags */
 }
 
 a.disabled {
    pointer-events: none;
    cursor: default;
    text-decoration: none;
-   color: black;
+   color: #008000; /* Dimmer green for disabled */
 }
 
 .doc_id {
   font-weight: normal;
   display: none;
-  color: #999;
+  color: #008000; /* Dimmer green */
 }
 
 h2:hover .doc_id {
@@ -124,4 +168,86 @@ h2:hover .doc_id {
 .sortBy {
   float: right;
   margin-bottom: 0;
+  font-size: 0.9em; /* Slightly smaller */
 }
+
+/* Overrides for .doc_preview from index.html inline styles */
+/* For a true monochrome terminal look, these !important tags are needed */
+/* unless the inline <style> block in index.html is removed/modified. */
+.doc_preview {
+    border: 2.5px solid #00FF00 !important;
+    background: #0A0A0A !important; /* Or transparent to match body, or a very dark green */
+    border-radius: 0 !important; /* No rounded corners */
+    color: #00FF00 !important; /* Ensure text within is green */
+}
+
+.doc_preview a, .doc_preview .doc_id {
+    color: #00FF00 !important;
+}
+
+.doc_preview a:hover {
+    color: #33FF33 !important;
+    background-color: #111111 !important; /* Subtle hover for links inside preview */
+}
+
+/* Ensure images within doc_preview also have a consistent border */
+.doc_preview .thumbnail_image img {
+    border: 1px solid #008000 !important; /* Override inline styles potentially */
+}
+.doc_preview .thumbnail_image img:hover {
+    border-color: #33FF33 !important;
+    opacity: 0.7;
+}
+
+/* General input/button styling (basic) */
+input[type="text"], input[type="submit"], button, select {
+    background-color: #101010;
+    color: #00FF00;
+    border: 1px solid #008000;
+    padding: 5px;
+    font-family: 'VT323', monospace;
+    font-size: 1em;
+}
+
+input[type="text"]:focus, select:focus {
+    outline: 1px dashed #33FF33;
+    background-color: #181818;
+}
+
+button:hover, input[type="submit"]:hover {
+    background-color: #003300;
+    color: #33FF33;
+    cursor: pointer;
+}
+
+/* Hide scrollbars with a retro feel if needed, but can harm accessibility */
+/* For example:
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+::-webkit-scrollbar-track {
+    background: #0D0D0D;
+    border: 1px solid #008000;
+}
+::-webkit-scrollbar-thumb {
+    background: #008000;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #00FF00;
+}
+*/
+
+/* Blinking cursor effect for fun (add to an element like a fake input prompt) */
+/*
+.blinking-cursor::after {
+    content: '_';
+    animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+    50% {
+        opacity: 0;
+    }
+}
+*/

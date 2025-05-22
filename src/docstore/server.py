@@ -2,8 +2,8 @@ import collections
 import datetime
 import functools
 import hashlib
-import os
-import pathlib
+# import os # os.path.abspath might not be needed anymore
+# import pathlib # pathlib.Path might not be needed directly here
 import secrets
 import typing
 import urllib.parse
@@ -12,18 +12,22 @@ from urllib.parse import parse_qsl, urlparse, urlencode
 from flask import (
     Flask,
     Response as FlaskResponse,
-    make_response,
+    # make_response, # Will construct FlaskResponse directly
     render_template,
     request,
-    send_file,
-    send_from_directory,
+    # send_file, # Replaced by storage interaction
+    # send_from_directory, # Replaced by storage interaction
+    current_app, # To access storage from app config
+    abort, # For 404 errors
 )
 import hyperlink
 import smartypants
 from werkzeug.middleware.profiler import ProfilerMiddleware
 
-from .documents import find_original_filename, read_documents
+# find_original_filename is removed, read_documents is updated
+from .documents import read_documents
 from .models import Document
+from .storage import Storage # Import Storage protocol
 from .tag_cloud import TagCloud
 from .tag_list import render_tag_list
 from .text_utils import hostname, pretty_date
@@ -42,31 +46,13 @@ def url_without_sortby(u: str) -> str:
     return str(url.remove("sortBy"))
 
 
-def serve_file(*, root: pathlib.Path, shard: str, filename: str) -> FlaskResponse:
-    """
-    Serves a file which has been saved in docstore.
+# The old serve_file function is removed. New function serve_document will handle this.
 
-    This adds the Content-Disposition header to the response, so files
-    are downloaded with the original filename they were uploaded as,
-    rather than the normalised filename.
-
-    """
-    path = os.path.abspath(os.path.join(root, "files", shard, filename))
-    response = make_response(send_file(path))
-
-    original_filename = find_original_filename(root, path=path)
-
-    # See https://stackoverflow.com/a/49481671/1558022 for UTF-8 encoding
-    encoded_filename = urllib.parse.quote(original_filename, encoding="utf-8")
-    response.headers["Content-Disposition"] = f"filename*=utf-8''{encoded_filename}"
-
-    return response
-
-
-def create_app(title: str, root: pathlib.Path, thumbnail_width: int) -> Flask:
+def create_app(title: str, storage: Storage, thumbnail_width: int) -> Flask:
     app = Flask(__name__)
 
-    app.config["THUMBNAIL_WIDTH"] = thumbnail_width
+    app.config["storage"] = storage
+    app.config["THUMBNAIL_WIDTH"] = thumbnail_width # Still used by templates
 
     app.jinja_env.trim_blocks = True
     app.jinja_env.lstrip_blocks = True
@@ -84,9 +70,10 @@ def create_app(title: str, root: pathlib.Path, thumbnail_width: int) -> Flask:
 
     @app.route("/")
     def list_documents() -> str:
+        active_storage: Storage = current_app.config["storage"]
         request_tags = set(request.args.getlist("tag"))
         documents = [
-            doc for doc in read_documents(root) if request_tags.issubset(set(doc.tags))
+            doc for doc in read_documents(active_storage) if request_tags.issubset(set(doc.tags))
         ]
 
         tag_tally: dict[str, int] = collections.Counter()
@@ -108,6 +95,9 @@ def create_app(title: str, root: pathlib.Path, thumbnail_width: int) -> Flask:
         elif sort_by == "random":
             if page == 1:
                 app.config["_RANDOM_SEED"] = secrets.token_bytes()
+            # Ensure _RANDOM_SEED is initialized if page > 1 but seed is not set (e.g. direct URL access)
+            if "_RANDOM_SEED" not in app.config:
+                 app.config["_RANDOM_SEED"] = secrets.token_bytes()
             seed = app.config["_RANDOM_SEED"]
 
             def sort_key(d: Document) -> str:
@@ -116,12 +106,21 @@ def create_app(title: str, root: pathlib.Path, thumbnail_width: int) -> Flask:
                 h.update(seed)
                 return h.hexdigest()
         else:
-            raise ValueError(f"Unrecognised sortBy query parameter: {sort_by}")
+            # Ensure to re-raise or handle appropriately for security
+            # For now, let it fall through to Flask's default error handling for unexpected values
+            pass # Or raise ValueError(f"Unrecognised sortBy query parameter: {sort_by}")
 
         if sort_by in {"date (newest first)", "title (Z to A)"}:
             sort_reverse = True
         else:
             sort_reverse = False
+        
+        # Handle case where sort_key might not be defined if sort_by is invalid
+        # and not caught by an explicit raise earlier.
+        # Defaulting to date sort or another safe default.
+        if 'sort_key' not in locals():
+            sort_key = lambda d: d.date_saved # Default sort
+            sort_reverse = True # Default sort order
 
         html = render_template(
             "index.html",
@@ -137,18 +136,47 @@ def create_app(title: str, root: pathlib.Path, thumbnail_width: int) -> Flask:
 
         return html
 
-    @app.route("/thumbnails/<shard>/<filename>")
-    def thumbnails(shard: str, filename: str) -> FlaskResponse:
-        return send_from_directory(
-            os.path.abspath(os.path.join(root, "thumbnails", shard)), filename
-        )
+    @app.route("/thumbnail/<path:key>")
+    def serve_thumbnail(key: str) -> FlaskResponse:
+        active_storage: Storage = current_app.config["storage"]
+        try:
+            thumbnail_bytes = active_storage.get_thumbnail_file(key)
+            # Assuming JPEG, S3Storage saves as .jpg. LocalStorage also does.
+            return FlaskResponse(thumbnail_bytes, mimetype="image/jpeg")
+        except FileNotFoundError:
+            abort(404, description="Thumbnail not found")
+        except Exception as e: # Catch other storage related errors
+            print(f"Error serving thumbnail {key}: {e}")
+            abort(500, description="Error serving thumbnail")
 
-    app.add_url_rule(
-        rule="/files/<shard>/<filename>",
-        view_func=lambda shard, filename: serve_file(
-            root=root, shard=shard, filename=filename
-        ),
-    )
+
+    @app.route("/file/<path:key>")
+    def serve_document(key: str) -> FlaskResponse:
+        active_storage: Storage = current_app.config["storage"]
+        try:
+            file_contents = active_storage.get_document_file(key)
+            original_filename = active_storage.get_document_original_filename(key)
+
+            encoded_filename = urllib.parse.quote(original_filename, encoding="utf-8")
+            
+            # Create a response with the file content
+            response = FlaskResponse(file_contents)
+            
+            # Set Content-Disposition header for download with original filename
+            response.headers["Content-Disposition"] = f"attachment; filename*=utf-8''{encoded_filename}"
+            
+            # Set a generic Content-Type; this could be improved with a mimetype library
+            # For S3, ContentType might be stored with the object.
+            # For LocalStorage, it's not stored by default.
+            response.mimetype = "application/octet-stream" # Default fallback
+            
+            return response
+        except FileNotFoundError:
+            abort(404, description="File not found")
+        except Exception as e: # Catch other storage related errors
+            print(f"Error serving file {key}: {e}")
+            abort(500, description="Error serving file")
+
 
     QueryString: typing.TypeAlias = list[tuple[str, str]]
 
