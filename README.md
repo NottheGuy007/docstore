@@ -1,45 +1,150 @@
 # docstore
 
 docstore is a tool I wrote to help me manage my scanned documents and reference files.
-It uses [keyword tagging](https://en.wikipedia.org/wiki/Tag_(metadata)) to categorise files, and creates thumbnails to help identify files.
+It uses [keyword tagging](https://en.wikipedia.org/wiki/Tag_(metadata)) to categorise files and creates thumbnails to help identify them.
+It now supports both local filesystem and S3-compatible cloud storage, and features a new "Green Screen Terminal" retro user interface.
 
 It has two parts:
 
-*   A CLI tool that lets me store new documents
-*   A web app that lets me browse the documents I've already stored
+*   A CLI tool that lets me store new documents.
+*   A web app that lets me browse the documents I've already stored.
 
-Here's an example of how I'd use the CLI tool to save a file:
+*(The previous screenshot has been removed as the UI has significantly changed to a "Green Screen Terminal" retro theme.)*
 
+The web app allows me to filter by one or more tags, or to sort by title/date, to help me find the document I'm looking for.
+
+## New Features (as of recent updates)
+
+*   **Flexible Storage Backend**: Choose between storing your documents on the local filesystem or in an S3-compatible object store. Configuration is managed via environment variables.
+*   **"Green Screen Terminal" Retro UI**: The web interface has been revamped with a nostalgic, hacker-esque green-on-black terminal theme.
+*   **Docker Support**: A `Dockerfile` is now included for easier deployment and consistent runtime environments.
+
+## Usage
+
+### Installation
+
+1.  Clone this repo:
+    ```console
+    $ git clone https://github.com/alexwlchan/docstore.git
+    $ cd docstore
+    ```
+
+2.  Create a virtual environment (recommended) and install dependencies:
+    The dependencies are listed in `requirements.in`. If you want to use the S3 storage backend, ensure `boto3` is included in `requirements.in`.
+    To compile `requirements.in` into `requirements.txt` (which is used for installation), you can use a tool like `uv` or `pip-tools`:
+    ```console
+    $ uv pip compile requirements.in --output-file requirements.txt
+    ```
+    Or, if you have `pip-tools` installed:
+    ```console
+    $ pip-compile requirements.in --output-file requirements.txt
+    ```
+    Then install the package and its dependencies:
+    ```console
+    $ pip3 install -e .
+    ```
+    If you are only using the local storage backend and don't want to install S3 dependencies, you can remove `boto3` from `requirements.in` before compiling.
+
+### Running the Web App (`docstore serve`)
+
+The web application's storage backend is configured using environment variables (see "Configuration via Environment Variables" section below).
+
+#### Using Local Storage
+Ensure `DOCSTORE_STORAGE_BACKEND` is set to `local` (or not set, as it defaults to local).
+Set `DOCSTORE_ROOT_PATH` to the directory where you want to store your documents.
+```console
+$ export DOCSTORE_STORAGE_BACKEND=local
+$ export DOCSTORE_ROOT_PATH=/path/to/my/docstore_data
+$ docstore serve
 ```
-docstore add '~/Desktop/Contract of Employment.pdf' \
+If `DOCSTORE_ROOT_PATH` is not set, it will use the `--root` CLI option, which defaults to the current directory.
+
+#### Using S3 Storage
+Set `DOCSTORE_STORAGE_BACKEND=s3` and provide your S3 bucket details and AWS credentials via environment variables.
+```console
+$ export DOCSTORE_STORAGE_BACKEND=s3
+$ export DOCSTORE_S3_BUCKET_NAME="your-s3-bucket-name"
+$ export AWS_ACCESS_KEY_ID="your-aws-access-key-id"
+$ export AWS_SECRET_ACCESS_KEY="your-aws-secret-access-key"
+$ export DOCSTORE_S3_REGION_NAME="your-s3-region"
+# export DOCSTORE_S3_ENDPOINT_URL="your-s3-compatible-endpoint-url" # Optional, for MinIO, etc.
+$ docstore serve
+```
+
+### CLI Commands
+
+CLI commands like `docstore add`, `docstore delete`, etc., also respect the storage configuration set via environment variables. For example, if S3 variables are configured, `docstore add` will upload the document to the specified S3 bucket.
+
+Here's an example of how I'd use the CLI tool to save a file (this will use the configured storage backend):
+```console
+$ docstore add '~/Desktop/Contract of Employment.pdf' \
   --source_url='https://email.example.com/message/1234' \
   --title='2020-10: Contract of employment for ACME' \
   --tags='employer:acme-corp, contract:employment'
 ```
 
-Here's a screenshot of the web app:
+**Note:** While most CLI commands are storage-agnostic, some operations (like `migrate` from V1) might have limitations or specific requirements regarding the storage backend (e.g., `migrate` currently only supports migrating *to* a `LocalStorage` backend).
 
-![A screenshot of docstore](docstore.png)
+Note that docstore is only intended for me to use -- it solves a specific problem that I have, and is designed to solve my exact needs. You're welcome to use it, but I'm unlikely to provide support or add features for other people.
 
-The web app allows me to filter by one or more tags, or to sort by title/date, to help me find the document I'm looking for.
+## Configuration via Environment Variables
 
+Docstore uses the following environment variables for configuration:
 
+*   **`DOCSTORE_STORAGE_BACKEND`**: Specifies the storage backend.
+    *   `local` (default): Uses the local filesystem.
+    *   `s3`: Uses an S3-compatible object store.
+*   **`DOCSTORE_ROOT_PATH`**: For `local` storage, the root directory for storing documents and metadata. (e.g., `/data/docstore`).
+*   **`DOCSTORE_S3_BUCKET_NAME`**: For `s3` storage, the name of your S3 bucket.
+*   **`AWS_ACCESS_KEY_ID`**: For `s3` storage, your AWS access key ID.
+*   **`AWS_SECRET_ACCESS_KEY`**: For `s3` storage, your AWS secret access key.
+*   **`DOCSTORE_S3_REGION_NAME`**: For `s3` storage, the AWS region of your bucket (e.g., `us-east-1`). Can also use `AWS_DEFAULT_REGION`.
+*   **`DOCSTORE_S3_ENDPOINT_URL`**: (Optional) For `s3` storage, the endpoint URL for S3-compatible services like MinIO.
+*   **`PORT`**: The port on which the web server will run (default for `docstore serve` is `3391`, but Docker uses `8080`).
 
-## Usage
+## Docker Deployment
 
-Clone this repo and install the package locally:
+A `Dockerfile` is provided for building and running docstore in a container.
 
-```console
-$ git clone https://github.com/alexwlchan/docstore.git
-$ cd docstore
-$ pip3 install -e .
-```
+1.  **Build the Docker image:**
+    ```console
+    $ docker build -t docstore-app .
+    ```
 
-You can add files using `docstore add` and run the web app with `docstore serve`.
+2.  **Run the Docker container:**
 
-Note that docstore is only intended for me to use -- it solves a specific problem that I have, and is designed to solve my exact needs.
+    *   **Using Local Storage (with a volume mount):**
+        Replace `/path/on/host/docstore_data` with the actual path on your host machine where you want to store data.
+        ```console
+        $ docker run -d -p 8080:8080 \
+          -v /path/on/host/docstore_data:/data/docstore \
+          -e DOCSTORE_STORAGE_BACKEND="local" \
+          -e DOCSTORE_ROOT_PATH="/data/docstore" \
+          -e PORT="8080" \
+          --name docstore_local docstore-app
+        ```
+        The application will be available at `http://localhost:8080`.
 
-You're welcome to use it, but I'm unlikely to provide support or add features for other people.
+    *   **Using S3 Storage:**
+        Set your S3 credentials and bucket information as environment variables.
+        ```console
+        $ docker run -d -p 8080:8080 \
+          -e DOCSTORE_STORAGE_BACKEND="s3" \
+          -e DOCSTORE_S3_BUCKET_NAME="your-s3-bucket-name" \
+          -e AWS_ACCESS_KEY_ID="your-aws-access-key-id" \
+          -e AWS_SECRET_ACCESS_KEY="your-aws-secret-access-key" \
+          -e DOCSTORE_S3_REGION_NAME="your-s3-region" \
+          # -e DOCSTORE_S3_ENDPOINT_URL="your-s3-compatible-endpoint-url" # Optional
+          -e PORT="8080" \
+          --name docstore_s3 docstore-app
+        ```
+        The application will be available at `http://localhost:8080`.
+
+3.  **Deploying to Platforms (e.g., Render, Fly.io, Google Cloud Run):**
+    *   Connect your Git repository to the platform.
+    *   The platform will use the `Dockerfile` to build and deploy your application.
+    *   Set the necessary environment variables (as listed above) in the platform's service configuration dashboard.
+    *   Ensure the `PORT` environment variable is correctly picked up by the platform (many set their own `PORT` which the `CMD` in the Dockerfile should respect).
 
 
 
@@ -65,9 +170,9 @@ Because reading source code is a pretty inefficient way to learn, I have some do
 *   **I prefer keyword tagging to files-and-folders as a way to organise files.**
     I'm a particular fan of how [Pinboard](https://pinboard.in/) does tagging, but I haven't found an app that stores files with Pinboard-like.
 
-*   **I want my documents stored locally.**
+*   **I want my documents stored locally (originally, now with cloud options).**
     My scanned paperwork in particular contains a lot of private information -- bank statements, medical letters, rental contracts, and more.
-    I don't want to upload them to a cloud service and risk them being leaked.
+    Initially, I didn't want to upload them to a cloud service. While local storage is still fully supported and a primary option, S3 support has been added for flexibility.
 
 *   **I'm very picky about how this sort of thing.**
     I've tried a bunch of other apps and services for doing this sort of thing, but none of them were quite right.
